@@ -1,0 +1,52 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: mysecret
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    mem_limit: 2g
+    cpus: 1.5
+
+  metabase:
+    image: metabase/metabase
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    depends_on:
+      - clickhouse
+    environment:
+      MB_DB_FILE: /metabase.db
+    volumes:
+      - metabase-data:/metabase.db
+
+  superset:
+    image: apache/superset
+    container_name: superset
+    ports:
+      - "8088:8088"
+    depends_on:
+      - clickhouse
+    environment:
+      SUPERSET_SECRET_KEY: supers3cret
+    command: >
+      /bin/sh -c "
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
+        superset init &&
+        superset run -p 8088 -h 0.0.0.0 --with-threads --reload --debugger
+      "
+
+volumes:
+  clickhouse-data:
+  metabase-data:
+
+networks:
+  bi-network:
+    driver: bridge
